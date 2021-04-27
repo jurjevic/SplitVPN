@@ -2,11 +2,15 @@ package split
 
 import (
 	"github.com/go-ping/ping"
+	"log"
+	"net"
 	"os/exec"
 	"time"
 )
 
 type State int
+
+const vpnMask = "/8"
 
 const (
 	NoConnected State = iota
@@ -22,6 +26,17 @@ type split struct {
 	router *router
 }
 
+type routeConfig struct {
+	isDefault     bool
+	gateway       string
+	route         string
+	interfaceName string
+}
+
+type Response struct {
+	SplitNow bool
+}
+
 func NewSplit() split {
 	return split{
 		router: newRouter(),
@@ -31,13 +46,13 @@ func NewSplit() split {
 	}
 }
 
-func (s *split) Start(update func (state State, inet *Zone, vpn *Zone)) {
+func (s *split) Start(update func(state State, inet *Zone, vpn *Zone) Response) {
 	go run(s.inet)
 	go run(s.vpn)
 	go s.observe(update)
 }
 
-func (s *split) observe(update func (state State, inet *Zone, vpn *Zone)) {
+func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response) {
 	laststate := NoConnected
 	for true {
 		if s.vpn.host == "" {
@@ -50,24 +65,73 @@ func (s *split) observe(update func (state State, inet *Zone, vpn *Zone)) {
 		if laststate != s.State {
 			laststate = s.State
 		}
-		update(laststate, s.inet, s.vpn)
+		response := update(laststate, s.inet, s.vpn)
+		if response.SplitNow {
+			s.mapZone(s.resplit)
+			response.SplitNow = false
+		}
 		time.Sleep(time.Second)
 		if s.inet.active && s.vpn.active {
 			s.State = Connected
+			if s.inet.gateway == "" || s.vpn.gateway == "" || s.inet.host == "" || s.vpn.host == "" {
+				s.mapZone(s.getRouteConfig)
+			}
 		} else if s.inet.active && !s.vpn.active {
 			s.State = InternetConnected
+			s.mapZone(s.getRouteConfig)
 		} else if !s.inet.active && s.vpn.active {
 			s.State = VpnConnected
-			s.reconnect()
-		}  else if !s.inet.active && !s.vpn.active {
+			s.mapZone(s.resplit)
+		} else if !s.inet.active && !s.vpn.active {
 			s.State = NoConnected
-			s.reconnect()
+			s.inet.gateway = ""
+			s.vpn.gateway = ""
+			s.vpn.host = ""
 		}
 	}
 }
 
-func (s *split) reconnect() {
-	vpnAddresses := make(map[string]IfNet)
+func (s *split) mapZone(call func() (vpnRouteConfig []routeConfig, inetRouteConfig routeConfig, ok bool)) {
+	vpnGateways, inetGateway, ok := call()
+	if ok {
+		for _, gw := range vpnGateways {
+			if gw.gateway == s.vpn.Host() {
+				s.vpn.interfaceName = gw.interfaceName
+				s.vpn.gateway = gw.gateway
+				s.vpn.route = gw.route
+			}
+		}
+		s.inet.interfaceName = inetGateway.interfaceName
+		s.inet.gateway = inetGateway.gateway
+		s.inet.route = inetGateway.route
+	}
+}
+
+func (s *split) resplit() (vpnRouteConfig []routeConfig, inetRouteConfig routeConfig, ok bool) {
+	vpnRouteConfig, inetRouteConfig, ok = s.getRouteConfig()
+	if ok {
+		for _, gw := range vpnRouteConfig {
+			cmd := "route -nv add -net " + gw.route + " -interface " + gw.interfaceName
+			_, err := exec.Command("/bin/sh", "-c", cmd).Output()
+			if err != nil {
+				log.Printf("Failed to add route. %s", err.Error())
+			} else {
+				log.Printf("VPN route added -- " + cmd)
+			}
+		}
+		cmd := "route change default " + inetRouteConfig.gateway
+		_, err := exec.Command("/bin/sh", "-c", cmd).Output()
+		if err != nil {
+			log.Printf("Failed to set default route. %s", err.Error())
+		} else {
+			log.Printf("Default gateway set -- " + cmd)
+		}
+	}
+	return
+}
+
+func (s *split) getRouteConfig() (vpnRouteConfig []routeConfig, inetRouteConfig routeConfig, ok bool) {
+	//vpnAddresses := make(map[string]IfNet)
 	inetAddresses := make(map[string]Route)
 	s.router.updateInterfaces()
 	ifnets := s.router.getInterfacesWithGateway()
@@ -75,49 +139,66 @@ func (s *split) reconnect() {
 	routes := s.router.getDefaultRoutes()
 	for _, r := range routes {
 		found := false
-		if !r.ipv6 {
-			for _, ifnet := range ifnets {
-				if r.gateway == ifnet.GatewayAddress {
-					vpnAddresses[ifnet.GatewayAddress] = ifnet
-					found = true
-				}
+		for _, ifnet := range ifnets {
+			if r.gateway == ifnet.GatewayAddress {
+				found = true
 			}
+		}
+		if !r.ipv6 {
 			if !found {
 				inetAddresses[r.gateway] = r
 			}
 		}
 	}
-	if len(vpnAddresses) > 0 && len(inetAddresses) > 0 {
-		for _, ifnet := range vpnAddresses {
-			_, err := exec.Command("/bin/sh", "-c", "route -nv add -net " + ifnet.GatewayAddress +"/8 -interface "+ifnet.Name).Output()
-			if err != nil {
-				println(err.Error()) // todo:
+	for _, ifnet := range ifnets {
+		vpnRouteConfig = append(vpnRouteConfig, routeConfig{
+			isDefault:     false,
+			gateway:       ifnet.GatewayAddress,
+			route:         maskIp(ifnet.GatewayAddress+vpnMask) + vpnMask,
+			interfaceName: ifnet.Name,
+		})
+	}
+
+	for _, r := range inetAddresses {
+		if r.isDefault {
+			inetRouteConfig = routeConfig{
+				isDefault:     r.isDefault,
+				gateway:       r.gateway,
+				route:         "default",
+				interfaceName: r.netif,
 			}
-		}
-		for _, r := range inetAddresses {
-			_, err := exec.Command("/bin/sh", "-c", "route change default " + r.gateway).Output()
-			if err != nil {
-				println(err.Error()) // todo:
-			}
+			ok = true
+			return // take the first pick
 		}
 	}
+	return
+}
+
+// Extracts IP mask from CIDR address.
+func maskIp(cidr string) string {
+	ip, ipNet, _ := net.ParseCIDR(cidr)
+	c := ip.Mask(ipNet.Mask)
+	return c.String()
 }
 
 func run(status *Zone) {
 	for true {
-		dur, _ := pingNow(status.host)
-		status.update(dur)
+		if status.host != "" {
+			dur, err := pingNow(status.host)
+			if err != nil {
+				log.Printf("Ping %s error: %s", status.host, err.Error())
+			}
+			status.update(dur)
+		}
 		time.Sleep(time.Second)
 	}
 }
 
 func pingNow(host string) (duration time.Duration, err error) {
-
 	pinger, perr := ping.NewPinger(host)
 	if perr != nil {
 		err = perr
 	}
-
 	pinger.Count = 1
 	pinger.Timeout = time.Second * 5
 	perr = pinger.Run() // Blocks until finished.

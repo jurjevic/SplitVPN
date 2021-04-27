@@ -10,10 +10,29 @@ const (
 )
 
 type Zone struct {
-	host   string
-	active bool
-	time   []time.Duration
-	mutex  sync.Mutex
+	host          string
+	gateway       string
+	route         string
+	interfaceName string
+	active        bool
+	time          []time.Duration
+	mutex         sync.Mutex
+}
+
+func (s *Zone) Route() string {
+	return s.route
+}
+
+func (s *Zone) InterfaceName() string {
+	return s.interfaceName
+}
+
+func (s *Zone) Gateway() string {
+	return s.gateway
+}
+
+func (s *Zone) Host() string {
+	return s.host
 }
 
 func (s *Zone) update(time time.Duration) {

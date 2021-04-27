@@ -1,6 +1,7 @@
 package split
 
 import (
+	"log"
 	"net"
 	"os/exec"
 	"strings"
@@ -26,7 +27,7 @@ type Route struct {
 	isDefault bool
 	gateway   string
 	flags     string
-	netif     string
+	netif     string // todo: interfaceName
 	ipv6      bool
 }
 
@@ -54,7 +55,10 @@ func (r *router) getDefaultRoutes() []Route {
 
 func (r *router) updateRoutes() {
 	routes := []Route{}
-	out, _ := exec.Command("/bin/sh", "-c", "netstat -rn").Output()
+	out, err := exec.Command("/bin/sh", "-c", "netstat -rn").Output()
+	if err != nil {
+		log.Printf("Failed to fetch routes. %s", err.Error())
+	}
 	routing := string(out)
 	rows := strings.Split(routing, "\n")
 	inetMode := false
@@ -118,7 +122,10 @@ func (r *router) updateInterfaces() {
 			ifnet.Broadcast = false
 		}
 
-		out, _ := exec.Command("/bin/sh", "-c", "ifconfig -r "+i.Name).Output()
+		out, err := exec.Command("/bin/sh", "-c", "ifconfig -r "+i.Name).Output()
+		if err != nil {
+			log.Printf("Failed to get interfaces. %s", err.Error())
+		}
 		ifdetails := string(out)
 
 		rows := strings.Split(ifdetails, "\n")

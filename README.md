@@ -6,7 +6,7 @@ Split Internet and VPN routing
 ## Install
 ```sh
 # install
-go install github.com/jurjevic/SplitVPN
+go install github.com/jurjevic/SplitVPN@latest
 
 # start
 sudo /bin/sh -c "$(go env GOPATH)/bin/SplitVPN &"
