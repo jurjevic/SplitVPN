@@ -15,8 +15,13 @@ type Zone struct {
 	route         string
 	interfaceName string
 	active        bool
+	activeSince   time.Time
 	time          []time.Duration
 	mutex         sync.Mutex
+}
+
+func (s *Zone) ActiveSince() time.Time {
+	return s.activeSince
 }
 
 func (s *Zone) Route() string {
@@ -35,13 +40,20 @@ func (s *Zone) Host() string {
 	return s.host
 }
 
-func (s *Zone) update(time time.Duration) {
+func (s *Zone) update(times time.Duration) {
 	s.mutex.Lock()
-	s.active = time > 0
+	if times > 0 {
+		s.active = true
+		if s.activeSince == (time.Time{}) {
+			s.activeSince = time.Now()
+		}
+	} else {
+		s.activeSince = time.Time{}
+	}
 	if len(s.time) >= maxResults {
 		s.time = s.time[1:]
 	}
-	s.time = append(s.time, time)
+	s.time = append(s.time, times)
 	s.mutex.Unlock()
 }
 

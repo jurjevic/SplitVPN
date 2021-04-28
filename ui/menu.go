@@ -15,93 +15,55 @@ var (
 )
 
 type Menu struct {
-	inetInfo *MenuInfo
-	vpnInfo  *MenuInfo
+	inetInfo     *MenuInfo
+	vpnInfo      *MenuInfo
 	requestSplit bool
 }
 
 type MenuInfo struct {
 	title *systray.MenuItem
-	info1 *systray.MenuItem
-	info2 *systray.MenuItem
-	info3 *systray.MenuItem
-	info4 *systray.MenuItem
-	info5 *systray.MenuItem
-	infoSub *systray.MenuItem
+	info  []*systray.MenuItem
 }
 
 const (
 	notConnected = "Not connected"
 )
 
-func newMenuInfo(title string) *MenuInfo {
+func newMenuInfo(title string, size int) *MenuInfo {
 	menuTitle := systray.AddMenuItem(title, "")
 	menuTitle.Disable()
-	menuInfo1 := systray.AddMenuItem("", "")
-	menuInfo1.Disable()
-	menuInfo1.Hide()
-	menuInfo2 := systray.AddMenuItem("", "")
-	menuInfo2.Disable()
-	menuInfo2.Hide()
-	menuInfo3 := systray.AddMenuItem("", "")
-	menuInfo3.Disable()
-	menuInfo3.Hide()
-	menuInfo4 := systray.AddMenuItem("", "")
-	menuInfo4.Disable()
-	menuInfo4.Hide()
-	menuInfo5 := systray.AddMenuItem("", "")
-	menuInfo5.Disable()
-	menuInfo5.Hide()
+	var menuItems []*systray.MenuItem
+	for i := 0; i < size; i++ {
+		menuInfo := systray.AddMenuItem("", "")
+		menuInfo.Disable()
+		menuInfo.Hide()
+		menuItems = append(menuItems, menuInfo)
+	}
+
 	return &MenuInfo{
 		title: menuTitle,
-		info1: menuInfo1,
-		info2: menuInfo2,
-		info3: menuInfo3,
-		info4: menuInfo4,
-		info5: menuInfo5,
+		info:  menuItems,
 	}
 }
 
-func (receiver *MenuInfo) Update(info1, info2, info3, info4, info5 string) {
-	if info1 == "" {
-		receiver.info1.Hide()
-		receiver.info1.SetTitle("")
-	} else {
-		receiver.info1.Show()
-		receiver.info1.SetTitle(info1)
-	}
-	if info2 == "" {
-		receiver.info2.Hide()
-		receiver.info2.SetTitle("")
-	} else {
-		receiver.info2.Show()
-		receiver.info2.SetTitle(info2)
-	}
-	if info3 == "" {
-		receiver.info3.Hide()
-		receiver.info3.SetTitle("")
-	} else {
-		receiver.info3.Show()
-		receiver.info3.SetTitle(info3)
-	}
-	if info4 == "" {
-		receiver.info4.Hide()
-		receiver.info4.SetTitle("")
-	} else {
-		receiver.info4.Show()
-		receiver.info4.SetTitle(info4)
-	}
-	if info5 == "" {
-		receiver.info5.Hide()
-		receiver.info5.SetTitle("")
-	} else {
-		receiver.info5.Show()
-		receiver.info5.SetTitle(info5)
+func (receiver *MenuInfo) Update(info []string) {
+	for i, menuItem := range receiver.info {
+		text := ""
+		if i < len(info) {
+			text = info[i]
+		}
+		if text == "" {
+			menuItem.Hide()
+			menuItem.SetTitle("")
+		} else {
+			menuItem.Show()
+			menuItem.SetTitle(text)
+		}
 	}
 }
 
 func (receiver *MenuInfo) UpdateNotConnected() {
-	receiver.Update(notConnected, "", "", "", "")
+	receiver.Update([]string{notConnected})
 }
 
 func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
@@ -127,35 +89,39 @@ func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
 		route = "Route: " + s.Route()
 	}
 
+	since := ""
+	if len(s.Route()) > 0 {
+		since = "Since: " + s.ActiveSince().Format("2006-01-02 15:04:05")
+	}
+
 	ping := ""
 	if avg > 0 {
 		ping = "Ping: " + strconv.Itoa(int(avg.Milliseconds())) + " ms"
 	}
 
-	receiver.Update(gw, ifname, route, host, ping)
+	receiver.Update([]string{gw, ifname, route, host, ping, since})
 }
 
 func Setup() *Menu {
 
 	m := &Menu{}
 
-	infoVpn := newMenuInfo("🔐 VPN")
+	infoVpn := newMenuInfo("🔐 VPN", 6)
 	infoVpn.UpdateNotConnected()
 
 	systray.AddSeparator()
 
-	infoInet := newMenuInfo("🌍 INET")
+	infoInet := newMenuInfo("🌍 INET", 6)
 	infoInet.UpdateNotConnected()
 
 	systray.AddSeparator()
 
-	infoBox := newMenuInfo("🗂 Information")
+	infoBox := newMenuInfo("🚀 Information", 4)
 	infoBox.Update(
-		"Version: " + Version,
-		"License: MIT",
-		"Build with: " + runtime.Version(),
-		"https://github.com/jurjevic/SplitVPN",
-		"")
+		[]string{"Version: " + Version,
+			"License: MIT",
+			"Build with: " + runtime.Version(),
+			"https://github.com/jurjevic/SplitVPN"})
 
 	systray.AddSeparator()
 	mSplit := systray.AddMenuItem("Split now", "Execute a split manually")
@@ -233,7 +199,7 @@ func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) spl
 	}
 	systray.SetIcon(ico)
 
-	r:=split.Response{}
+	r := split.Response{}
 
 	if m.requestSplit {
 		r.SplitNow = true
