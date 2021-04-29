@@ -90,7 +90,7 @@ func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
 	}
 
 	since := ""
-	if len(s.Route()) > 0 {
+	if s.ActiveSince() != (time.Time{}) {
 		since = "Since: " + s.ActiveSince().Format("2006-01-02 15:04:05")
 	}
 

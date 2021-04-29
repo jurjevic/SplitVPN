@@ -13,7 +13,6 @@ import (
 	"strings"
 )
 
-const Version = "0.1.2 beta"
 
 func main() {
 

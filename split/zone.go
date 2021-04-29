@@ -48,6 +48,7 @@ func (s *Zone) update(times time.Duration) {
 			s.activeSince = time.Now()
 		}
 	} else {
+		s.active = false
 		s.activeSince = time.Time{}
 	}
 	if len(s.time) >= maxResults {

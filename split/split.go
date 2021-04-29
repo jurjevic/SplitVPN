@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -91,24 +92,44 @@ func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response
 	}
 }
 
-func (s *split) mapZone(call func() (vpnRouteConfig []routeConfig, inetRouteConfig routeConfig, ok bool)) {
-	vpnGateways, inetGateway, ok := call()
+func (s *split) mapZone(call func() (vpnRouteConfig []routeConfig, inetRouteConfig []routeConfig, ok bool)) {
+	vpnGateways, inetGateways, ok := call()
 	if ok {
+		s.vpn.interfaceName = ""
+		s.vpn.gateway = ""
+		s.vpn.route = ""
 		for _, gw := range vpnGateways {
 			if gw.gateway == s.vpn.Host() {
-				s.vpn.interfaceName = gw.interfaceName
-				s.vpn.gateway = gw.gateway
-				s.vpn.route = gw.route
+				s.vpn.interfaceName += gw.interfaceName + " "
+				s.vpn.gateway += gw.gateway + " "
+				s.vpn.route += gw.route + " "
 			}
 		}
-		s.inet.interfaceName = inetGateway.interfaceName
-		s.inet.gateway = inetGateway.gateway
-		s.inet.route = inetGateway.route
+		s.inet.interfaceName = ""
+		s.inet.gateway = ""
+		s.inet.route = ""
+		for _, gw := range inetGateways {
+			s.inet.interfaceName = assignNonDuplicate(s.inet.interfaceName, gw.interfaceName)
+			s.inet.gateway = assignNonDuplicate(s.inet.gateway, gw.gateway)
+			s.inet.route = assignNonDuplicate(s.inet.route, gw.route)
+		}
 	}
 }
 
-func (s *split) resplit() (vpnRouteConfig []routeConfig, inetRouteConfig routeConfig, ok bool) {
+func assignNonDuplicate(in string, val string) string {
+	if strings.Contains(in, val) {
+		return in
+	}
+	if len(in) > 0 {
+		return in + " | " + val
+	} else {
+		return val
+	}
+}
+
+func (s *split) resplit() (vpnRouteConfig []routeConfig, inetRouteConfig []routeConfig, ok bool) {
 	vpnRouteConfig, inetRouteConfig, ok = s.getRouteConfig()
+	log.Printf("Perform split...")
 	if ok {
 		for _, gw := range vpnRouteConfig {
 			cmd := "route -nv add -net " + gw.route + " -interface " + gw.interfaceName
@@ -119,20 +140,21 @@ func (s *split) resplit() (vpnRouteConfig []routeConfig, inetRouteConfig routeCo
 				log.Printf("VPN route added -- " + cmd)
 			}
 		}
-		cmd := "route change default " + inetRouteConfig.gateway
-		_, err := exec.Command("/bin/sh", "-c", cmd).Output()
-		if err != nil {
-			log.Printf("Failed to set default route. %s", err.Error())
-		} else {
-			log.Printf("Default gateway set -- " + cmd)
+		for _, r := range inetRouteConfig {
+			cmd := "route change default " + r.gateway
+			_, err := exec.Command("/bin/sh", "-c", cmd).Output()
+			if err != nil {
+				log.Printf("Failed to set default route. %s", err.Error())
+			} else {
+				log.Printf("Default gateway set -- " + cmd)
+			}
 		}
 	}
+	log.Printf("Done!")
 	return
 }
 
-func (s *split) getRouteConfig() (vpnRouteConfig []routeConfig, inetRouteConfig routeConfig, ok bool) {
-	//vpnAddresses := make(map[string]IfNet)
-	inetAddresses := make(map[string]Route)
+func (s *split) getRouteConfig() (vpnRouteConfig []routeConfig, inetRouteConfig []routeConfig, ok bool) {
 	s.router.updateInterfaces()
 	ifnets := s.router.getInterfacesWithGateway()
 	s.router.updateRoutes()
@@ -144,11 +166,16 @@ func (s *split) getRouteConfig() (vpnRouteConfig []routeConfig, inetRouteConfig 
 				found = true
 			}
 		}
-		if !r.ipv6 {
-			if !found {
-				inetAddresses[r.gateway] = r
-			}
+		if r.isDefault && !r.ipv6 && !found {
+			inetRouteConfig = append(inetRouteConfig, routeConfig{
+				isDefault:     r.isDefault,
+				gateway:       r.gateway,
+				route:         "default",
+				interfaceName: r.netif,
+			})
+			ok = true
 		}
+
 	}
 	for _, ifnet := range ifnets {
 		vpnRouteConfig = append(vpnRouteConfig, routeConfig{
@@ -159,18 +186,6 @@ func (s *split) getRouteConfig() (vpnRouteConfig []routeConfig, inetRouteConfig 
 		})
 	}
 
-	for _, r := range inetAddresses {
-		if r.isDefault {
-			inetRouteConfig = routeConfig{
-				isDefault:     r.isDefault,
-				gateway:       r.gateway,
-				route:         "default",
-				interfaceName: r.netif,
-			}
-			ok = true
-			return // take the first pick
-		}
-	}
 	return
 }
 
@@ -187,8 +202,10 @@ func run(status *Zone) {
 			dur, err := pingNow(status.host)
 			if err != nil {
 				log.Printf("Ping %s error: %s", status.host, err.Error())
+				status.update(0)
+			} else {
+				status.update(dur)
 			}
-			status.update(dur)
 		}
 		time.Sleep(time.Second)
 	}
