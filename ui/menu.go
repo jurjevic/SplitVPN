@@ -89,6 +89,15 @@ func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
 		route = "Route: " + s.Route()
 	}
 
+	http := ""
+	if s.IsDefault() {
+		if s.HttpRequest() {
+			http = "HTTP: Ok"
+		} else {
+			http = "HTTP: Error"
+		}
+	}
+
 	since := ""
 	if s.ActiveSince() != (time.Time{}) {
 		since = "Since: " + s.ActiveSince().Format("2006-01-02 15:04:05")
@@ -99,19 +108,19 @@ func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
 		ping = "Ping: " + strconv.Itoa(int(avg.Milliseconds())) + " ms"
 	}
 
-	receiver.Update([]string{gw, ifname, route, host, ping, since})
+	receiver.Update([]string{gw, ifname, route, host, http, ping, since})
 }
 
 func Setup() *Menu {
 
 	m := &Menu{}
 
-	infoVpn := newMenuInfo("🔐 VPN", 6)
+	infoVpn := newMenuInfo("🔐 VPN", 7)
 	infoVpn.UpdateNotConnected()
 
 	systray.AddSeparator()
 
-	infoInet := newMenuInfo("🌍 INET", 6)
+	infoInet := newMenuInfo("🌍 INET", 7)
 	infoInet.UpdateNotConnected()
 
 	systray.AddSeparator()

@@ -4,6 +4,7 @@ import (
 	"github.com/go-ping/ping"
 	"log"
 	"net"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -98,20 +99,24 @@ func (s *split) mapZone(call func() (vpnRouteConfig []routeConfig, inetRouteConf
 		s.vpn.interfaceName = ""
 		s.vpn.gateway = ""
 		s.vpn.route = ""
+		s.vpn.isDefault = false
 		for _, gw := range vpnGateways {
 			if gw.gateway == s.vpn.Host() {
 				s.vpn.interfaceName += gw.interfaceName + " "
 				s.vpn.gateway += gw.gateway + " "
 				s.vpn.route += gw.route + " "
+				s.vpn.isDefault = gw.isDefault
 			}
 		}
 		s.inet.interfaceName = ""
 		s.inet.gateway = ""
 		s.inet.route = ""
+		s.inet.isDefault = false
 		for _, gw := range inetGateways {
 			s.inet.interfaceName = assignNonDuplicate(s.inet.interfaceName, gw.interfaceName)
 			s.inet.gateway = assignNonDuplicate(s.inet.gateway, gw.gateway)
 			s.inet.route = assignNonDuplicate(s.inet.route, gw.route)
+			s.inet.isDefault = gw.isDefault
 		}
 	}
 }
@@ -204,10 +209,22 @@ func run(status *Zone) {
 				log.Printf("Ping %s error: %s", status.host, err.Error())
 				status.update(0)
 			} else {
+				if status.isDefault {
+					go updateHttpRequest(status)
+				}
 				status.update(dur)
 			}
 		}
 		time.Sleep(time.Second)
+	}
+}
+
+func updateHttpRequest(status *Zone) {
+	if err := requestNow(status.host); err != nil {
+		log.Printf("Request http://%s error: %s", status.host, err.Error())
+		status.httpRequest = false
+	} else {
+		status.httpRequest = true
 	}
 }
 
@@ -225,4 +242,13 @@ func pingNow(host string) (duration time.Duration, err error) {
 	stats := pinger.Statistics()
 	duration = stats.AvgRtt
 	return
+}
+
+func requestNow(host string) error {
+	resp, err := http.Get("http://" + host)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }

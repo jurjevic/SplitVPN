@@ -12,12 +12,22 @@ const (
 type Zone struct {
 	host          string
 	gateway       string
+	isDefault     bool
 	route         string
 	interfaceName string
+	httpRequest   bool
 	active        bool
 	activeSince   time.Time
 	time          []time.Duration
 	mutex         sync.Mutex
+}
+
+func (s *Zone) IsDefault() bool {
+	return s.isDefault
+}
+
+func (s *Zone) HttpRequest() bool {
+	return s.httpRequest
 }
 
 func (s *Zone) ActiveSince() time.Time {
