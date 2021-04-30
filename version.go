@@ -1,4 +1,3 @@
 package main
 
-const Version = "0.1.3 beta" // ### incSemVer(line)
-
+const Version = "0.9.0-alpha" // ###  ftoken[3] = "\"" + NewVersion + "\""; Join(ftoken, " ")
