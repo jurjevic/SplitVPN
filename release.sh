@@ -16,7 +16,7 @@ fi
 go get github.com/blang/semver/v4@latest
 
 new_version="$1"
-tag_version="v$NewVersion"
+tag_version="v$new_version"
 latest="latest"
 
 $(go env GOPATH)/bin/golf -v version.go version.go -- '
@@ -26,5 +26,6 @@ git add version.go
 git commit -m "$tag_version release build with version increment."
 
 git push origin :refs/tags/$latest
-git tag -fa $latest
+git tag -fa $latest -m "$tag_version release build with version increment."
+git tag -fa $tag_version -m "$tag_version release build with version increment."
 git push origin main --tags
