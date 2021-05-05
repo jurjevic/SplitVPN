@@ -20,10 +20,10 @@ func createExitMenu() {
 }
 
 func createNetMenu() (*MenuInfo, *MenuInfo) {
-	infoVpn := newMenuInfo("🔐 VPN", 7)
+	infoVpn := newMenuInfo("🔐 VPN", 8)
 	infoVpn.UpdateNotConnected()
 	systray.AddSeparator()
-	infoInet := newMenuInfo("🌍 INET", 7)
+	infoInet := newMenuInfo("🌍 INET", 8)
 	infoInet.UpdateNotConnected()
 	return infoVpn, infoInet
 }

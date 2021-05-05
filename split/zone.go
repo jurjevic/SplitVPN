@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	maxResults = 10
+	MaxResults = 10
 )
 
 type Zone struct {
@@ -58,7 +58,15 @@ func (z *Zone) Host() string {
 
 func (z *Zone) update(times time.Duration) {
 	z.mutex.Lock()
-	if times > 0 {
+	// add data
+	if len(z.time) >= MaxResults {
+		z.time = z.time[1:]
+	}
+	z.time = append(z.time, times)
+	z.mutex.Unlock()
+	// set active state
+	_, _, ok := z.Average()
+	if  ok  {
 		z.active = true
 		if z.activeSince == (time.Time{}) {
 			z.activeSince = time.Now()
@@ -67,17 +75,9 @@ func (z *Zone) update(times time.Duration) {
 		z.active = false
 		z.activeSince = time.Time{}
 	}
-	if len(z.time) >= maxResults {
-		z.time = z.time[1:]
-	}
-	z.time = append(z.time, times)
-	z.mutex.Unlock()
 }
 
-func (z *Zone) Average() (time.Duration, bool) {
-	if z.active == false {
-		return 0, false
-	}
+func (z *Zone) Average() (time.Duration, int, bool) {
 	z.mutex.Lock()
 	var avg time.Duration = 0
 	count := 0
@@ -90,9 +90,10 @@ func (z *Zone) Average() (time.Duration, bool) {
 	}
 	z.mutex.Unlock()
 	if count == 0 {
-		return 0, false
+		return 0, 0, false
 	}
-	return avg / time.Duration(count), true
+	rate := (100 * count / len(z.time))
+	return avg / time.Duration(count), rate, true
 }
 
 func (z *Zone) Ping2() error {

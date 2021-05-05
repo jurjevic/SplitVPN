@@ -81,7 +81,7 @@ func (receiver *MenuInfo) UpdateNotConnected() {
 }
 
 func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
-	avg, _ := s.Average()
+	avg, rateValue, _ := s.Average()
 
 	gw := ""
 	if len(s.Gateway()) > 0 {
@@ -122,7 +122,40 @@ func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
 		ping = "Ping: " + strconv.Itoa(int(avg.Milliseconds())) + " ms"
 	}
 
-	receiver.Update([]string{gw, ifname, route, host, http, ping, since})
+	rate := ""
+	if rateValue > 0 {
+		rate = "Rate: " + textScala(rateValue, 100)
+	}
+
+	receiver.Update([]string{gw, ifname, route, host, http, ping, rate, since})
+}
+
+func textScala(value, max int) string {
+	rate := 10 * value / max
+	switch rate {
+	case 10:
+		return "■■■■■■■■■■"
+	case 9:
+		return "■■■■■■■■■□"
+	case 8:
+		return "■■■■■■■■□□"
+	case 7:
+		return "■■■■■■■□□□"
+	case 6:
+		return "■■■■■■□□□□"
+	case 5:
+		return "■■■■■□□□□□"
+	case 4:
+		return "■■■■□□□□□□"
+	case 3:
+		return "■■■□□□□□□□"
+	case 2:
+		return "■■□□□□□□□□"
+	case 1:
+		return "■□□□□□□□□□"
+	default:
+		return "□□□□□□□□□□"
+	}
 }
 
 func Setup() *Menu {
@@ -219,14 +252,14 @@ func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) spl
 	} else if vpnStatus == 0 && inetStatus == 0 {
 		ico = icon.Data_0_0
 	}
-	_, ok := vpn.Average()
+	_, _, ok := vpn.Average()
 	if !ok {
 		m.vpnInfo.UpdateNotConnected()
 	} else {
 		m.vpnInfo.UpdateConnected(vpn)
 	}
 
-	_, ok = inet.Average()
+	_, _, ok = inet.Average()
 	if !ok {
 		m.inetInfo.UpdateNotConnected()
 	} else {
@@ -256,10 +289,10 @@ func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) spl
 	return r
 }
 
-func getStatus(duration time.Duration, ok bool) int {
+func getStatus(duration time.Duration, rate int, ok bool) int {
 	if !ok {
 		return 0
-	} else if duration < 20*time.Millisecond {
+	} else if duration < 20*time.Millisecond && rate > 50 {
 		return 3
 	} else if duration < 200*time.Millisecond {
 		return 2
