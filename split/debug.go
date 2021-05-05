@@ -77,6 +77,13 @@ func (s split) startDiagnose() {
 	PrintTitle("INET Zone")
 	s.inet.diagnose()
 
+	PrintTitle("Internet Service Provider - System proxy")
+	fetchISP()
+
+	PrintTitle("Internet Service Provider - No proxy")
+	fetchNoProxyISP()
+
+
 	println()
 	printChar("▬", 80)
 	println()

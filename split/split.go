@@ -77,7 +77,7 @@ func (s *split) Start(update func(state State, inet *Zone, vpn *Zone) Response, 
 func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response, stateChanged func(state State, isp Isp)) {
 	laststate := NoConnected
 	for true {
-		if s.vpn.host == "" && s.automatic {
+		if s.automatic {
 			s.router.updateInterfaces()
 			ifnets := s.router.getInterfacesWithGateway()
 			for _, ifnet := range ifnets {
@@ -233,7 +233,7 @@ func maskIp(cidr string) string {
 	return c.String()
 }
 
-func run(status *Zone) {
+func run(status *Zone) { // todo: move to zone
 	for true {
 		if status.host != "" {
 			err := status.Ping()

@@ -38,6 +38,7 @@ type Isp struct {
 func fetchISP() Isp {
 	cmd := "nscurl http://ip-api.com/json?fields=66846719"
 	out, err := exec.Command("/bin/sh", "-c", cmd).Output()
+	Debugln(string(out))
 	if err != nil {
 		log.Printf("Failed to fetch ISP. %s", err.Error())
 		return Isp{}
@@ -53,7 +54,7 @@ func fetchISP() Isp {
 	return isp
 }
 
-func fetchISP2() Isp {
+func fetchNoProxyISP() Isp {
 	url := "http://ip-api.com/json?fields=66846719"
 
 	ispClient := http.Client{
@@ -82,6 +83,7 @@ func fetchISP2() Isp {
 		return Isp{}
 	}
 
+	Debugln(string(body))
 	isp := Isp{}
 	jsonErr := json.Unmarshal(body, &isp)
 	if jsonErr != nil {

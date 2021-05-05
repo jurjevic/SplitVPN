@@ -28,4 +28,20 @@ git commit -m "$tag_version release build with version increment."
 git push origin :refs/tags/$latest
 git tag -fa $latest -m "$tag_version release build with version increment."
 git tag -fa $tag_version -m "$tag_version release build with version increment."
-git push origin main --tags
+git push origin main --tags --force
+
+cd $(brew --repository jurjevic/homebrew-tap)
+download="https://github.com/jurjevic/SplitVPN/archive/$tag_version.tar.gz"
+wget $download
+hash=$(sha256sum $tag_version.tar.gz)
+rm "$tag_version.tar.gz"
+
+golf Formula/splitvpn.rb Formula/splitvpn.rb -- '
+  var HashOutput string = "'$hash'"
+  var Hash string = Split(HashOutput, " ")[0]
+  var Download string = "'$download'"
+'
+
+git add Formula/splitvpn.rb
+git commit -m "splitvpn $tag_version added."
+git push origin
