@@ -4,8 +4,6 @@ import (
 	"github.com/getlantern/systray"
 	"github.com/jurjevic/SplitVPN/icon"
 	"github.com/jurjevic/SplitVPN/split"
-	"log"
-	"runtime"
 	"strconv"
 	"time"
 )
@@ -17,6 +15,8 @@ var (
 type Menu struct {
 	inetInfo     *MenuInfo
 	vpnInfo      *MenuInfo
+	ispInfo      *MenuInfo
+	extIpInfo    *MenuInfo
 	requestSplit bool
 }
 
@@ -35,6 +35,22 @@ func newMenuInfo(title string, size int) *MenuInfo {
 	var menuItems []*systray.MenuItem
 	for i := 0; i < size; i++ {
 		menuInfo := systray.AddMenuItem("", "")
+		menuInfo.Disable()
+		menuInfo.Hide()
+		menuItems = append(menuItems, menuInfo)
+	}
+
+	return &MenuInfo{
+		title: menuTitle,
+		info:  menuItems,
+	}
+}
+
+func newSubMenuInfo(title string, size int) *MenuInfo {
+	menuTitle := systray.AddMenuItem(title, "")
+	var menuItems []*systray.MenuItem
+	for i := 0; i < size; i++ {
+		menuInfo := menuTitle.AddSubMenuItem("", "")
 		menuInfo.Disable()
 		menuInfo.Hide()
 		menuItems = append(menuItems, menuInfo)
@@ -115,45 +131,57 @@ func Setup() *Menu {
 
 	m := &Menu{}
 
-	infoVpn := newMenuInfo("🔐 VPN", 7)
-	infoVpn.UpdateNotConnected()
+	infoVpn, infoInet := createNetMenu()
 
-	systray.AddSeparator()
+	createSplitNow(m)
+	createBrowserExternalIp(m)
+	createInfoBox()
 
-	infoInet := newMenuInfo("🌍 INET", 7)
-	infoInet.UpdateNotConnected()
-
-	systray.AddSeparator()
-
-	infoBox := newMenuInfo("🚀 Information", 4)
-	infoBox.Update(
-		[]string{"Version: " + Version,
-			"License: MIT",
-			"Build with: " + runtime.Version(),
-			"https://github.com/jurjevic/SplitVPN"})
-
-	systray.AddSeparator()
-	mSplit := systray.AddMenuItem("Split now", "Execute a split manually")
-	go func() {
-		for true {
-			<-mSplit.ClickedCh
-			m.requestSplit = true
-		}
-	}()
-
-	systray.AddSeparator()
-	mQuit := systray.AddMenuItem("Exit", "Exit SplitVPN")
-
-	go func() {
-		<-mQuit.ClickedCh
-		log.Println("Exiting SplitVPN")
-		systray.Quit()
-	}()
+	createExitMenu()
 
 	m.inetInfo = infoInet
 	m.vpnInfo = infoVpn
 
 	return m
+}
+
+func (m *Menu) StateChanged(state split.State, isp split.Isp) {
+	switch state {
+	case split.NoConnected:
+		m.updateConnectedState(split.Isp{})
+	case split.VpnConnected:
+		m.updateConnectedState(isp)
+	case split.InternetConnected:
+		m.updateConnectedState(isp)
+	case split.Connected:
+		m.updateConnectedState(isp)
+	}
+}
+
+func (m *Menu) updateConnectedState(isp split.Isp) {
+	if isp.Query == "" {
+		m.extIpInfo.title.Hide()
+		m.ispInfo.title.Hide()
+	} else {
+	m.extIpInfo.title.SetTitle("📡 " + isp.Query)
+	m.extIpInfo.title.Show()
+	m.extIpInfo.Update([]string{
+		"Status: " + isp.Status,
+		"Mobile: " + strconv.FormatBool(isp.Mobile),
+		"Proxy: " + strconv.FormatBool(isp.Proxy),
+		"Hosting: " + strconv.FormatBool(isp.Hosting),
+	})
+	m.ispInfo.title.SetTitle("🔭 " + isp.Isp)
+	m.ispInfo.title.Show()
+	m.ispInfo.Update([]string{
+		isp.As,
+		isp.Asname,
+		isp.City,
+		isp.RegionName,
+		isp.Country,
+		isp.Continent,
+	})
+	}
 }
 
 func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) split.Response {

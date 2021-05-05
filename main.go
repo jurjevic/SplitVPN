@@ -32,7 +32,7 @@ func onReady() {
 	menu := ui.Setup()
 
 	splitInstance := split.NewSplit()
-	splitInstance.Start(menu.Refresh)
+	splitInstance.Start(menu.Refresh, menu.StateChanged)
 }
 
 func onExit() {

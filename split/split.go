@@ -48,13 +48,13 @@ func NewSplit() split {
 	}
 }
 
-func (s *split) Start(update func(state State, inet *Zone, vpn *Zone) Response) {
+func (s *split) Start(update func(state State, inet *Zone, vpn *Zone) Response, stateChanged func(state State, isp Isp)) {
 	go run(s.inet)
 	go run(s.vpn)
-	go s.observe(update)
+	go s.observe(update, stateChanged)
 }
 
-func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response) {
+func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response, stateChanged func(state State, isp Isp)) {
 	laststate := NoConnected
 	for true {
 		if s.vpn.host == "" {
@@ -66,6 +66,8 @@ func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response
 		}
 		if laststate != s.State {
 			laststate = s.State
+			isp := fetchISP()
+			stateChanged(s.State, isp)
 		}
 		response := update(laststate, s.inet, s.vpn)
 		if response.SplitNow {
