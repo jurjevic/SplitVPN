@@ -2,6 +2,7 @@ package ui
 
 import (
 	"github.com/getlantern/systray"
+	"github.com/jurjevic/SplitVPN/split"
 	"log"
 	"os/exec"
 	"runtime"
@@ -34,6 +35,43 @@ func createSplitNow(m *Menu) {
 		for true {
 			<-mSplit.ClickedCh
 			m.requestSplit = true
+		}
+	}()
+}
+
+func createDebug(m *Menu) {
+	systray.AddSeparator()
+	mDiagnose := systray.AddMenuItemCheckbox("Diagnose", "Print diagnose information to the console", false)
+	go func() {
+		for true {
+			<-mDiagnose.ClickedCh
+			m.requestDiagnose = true
+		}
+	}()
+	mDebugMode := systray.AddMenuItemCheckbox("Debug Mode", "Produce verbose debug messages to the console", false)
+	go func() {
+		for true {
+			<-mDebugMode.ClickedCh
+			if mDebugMode.Checked() {
+				mDebugMode.Uncheck()
+				split.DebugFlag = false
+			} else {
+				mDebugMode.Check()
+				split.DebugFlag = true
+			}
+		}
+	}()
+	mAutomaticMode := systray.AddMenuItemCheckbox("Automatic Mode", "Detected network changes and perform split automatically", true)
+	go func() {
+		for true {
+			<-mAutomaticMode.ClickedCh
+			if mAutomaticMode.Checked() {
+				mAutomaticMode.Uncheck()
+				m.requestAutomaticMode = split.False
+			} else {
+				mAutomaticMode.Check()
+				m.requestAutomaticMode = split.True
+			}
 		}
 	}()
 }
@@ -72,7 +110,7 @@ func createInfoBox() {
 	systray.AddSeparator()
 	infoBox := newSubMenuInfo("🚀 Information", 4)
 	infoBox.Update(
-		[]string{"Version: " + Version,
+		[]string{"Version: " + split.Version,
 			"License: MIT",
 			"Build with: " + runtime.Version(),
 			"https://github.com/jurjevic/SplitVPN"})

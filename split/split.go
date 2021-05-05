@@ -1,7 +1,6 @@
 package split
 
 import (
-	"github.com/go-ping/ping"
 	"log"
 	"net"
 	"net/http"
@@ -22,10 +21,11 @@ const (
 )
 
 type split struct {
-	inet   *Zone
-	vpn    *Zone
-	State  State
-	router *router
+	inet      *Zone
+	vpn       *Zone
+	State     State
+	router    *router
+	automatic bool
 }
 
 type routeConfig struct {
@@ -35,8 +35,27 @@ type routeConfig struct {
 	interfaceName string
 }
 
+type Bool int
+
+func (b Bool) bool() bool {
+	switch b {
+	case True:
+		return true
+	default:
+		return false
+	}
+}
+
+const (
+	Nil Bool = iota -1
+	False
+	True
+)
+
 type Response struct {
-	SplitNow bool
+	SplitNow            bool
+	Diagnose            bool
+	AutomaticMode Bool
 }
 
 func NewSplit() split {
@@ -45,6 +64,7 @@ func NewSplit() split {
 		State:  NoConnected,
 		inet:   &Zone{host: "google.com"},
 		vpn:    &Zone{},
+		automatic: true,
 	}
 }
 
@@ -57,7 +77,7 @@ func (s *split) Start(update func(state State, inet *Zone, vpn *Zone) Response, 
 func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response, stateChanged func(state State, isp Isp)) {
 	laststate := NoConnected
 	for true {
-		if s.vpn.host == "" {
+		if s.vpn.host == "" && s.automatic {
 			s.router.updateInterfaces()
 			ifnets := s.router.getInterfacesWithGateway()
 			for _, ifnet := range ifnets {
@@ -73,6 +93,14 @@ func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response
 		if response.SplitNow {
 			s.mapZone(s.resplit)
 			response.SplitNow = false
+		}
+		if response.Diagnose {
+			s.startDiagnose()
+			response.Diagnose = false
+		}
+		if response.AutomaticMode != Nil {
+			s.automatic = response.AutomaticMode.bool()
+			response.AutomaticMode = Nil
 		}
 		time.Sleep(time.Second)
 		if s.inet.active && s.vpn.active {
@@ -140,7 +168,8 @@ func (s *split) resplit() (vpnRouteConfig []routeConfig, inetRouteConfig []route
 	if ok {
 		for _, gw := range vpnRouteConfig {
 			cmd := "route -nv add -net " + gw.route + " -interface " + gw.interfaceName
-			_, err := exec.Command("/bin/sh", "-c", cmd).Output()
+			out, err := exec.Command("/bin/sh", "-c", cmd).Output()
+			Debugln(string(out))
 			if err != nil {
 				log.Printf("Failed to add route. %s", err.Error())
 			} else {
@@ -149,7 +178,8 @@ func (s *split) resplit() (vpnRouteConfig []routeConfig, inetRouteConfig []route
 		}
 		for _, r := range inetRouteConfig {
 			cmd := "route change default " + r.gateway
-			_, err := exec.Command("/bin/sh", "-c", cmd).Output()
+			out, err := exec.Command("/bin/sh", "-c", cmd).Output()
+			Debugln(string(out))
 			if err != nil {
 				log.Printf("Failed to set default route. %s", err.Error())
 			} else {
@@ -206,7 +236,7 @@ func maskIp(cidr string) string {
 func run(status *Zone) {
 	for true {
 		if status.host != "" {
-			dur, err := pingNow(status.host)
+			err := status.Ping()
 			if err != nil {
 				log.Printf("Ping %s error: %s", status.host, err.Error())
 				status.update(0)
@@ -214,7 +244,6 @@ func run(status *Zone) {
 				if status.isDefault {
 					go updateHttpRequest(status)
 				}
-				status.update(dur)
 			}
 		}
 		time.Sleep(time.Second)
@@ -228,22 +257,6 @@ func updateHttpRequest(status *Zone) {
 	} else {
 		status.httpRequest = true
 	}
-}
-
-func pingNow(host string) (duration time.Duration, err error) {
-	pinger, perr := ping.NewPinger(host)
-	if perr != nil {
-		err = perr
-	}
-	pinger.Count = 1
-	pinger.Timeout = time.Second * 5
-	perr = pinger.Run() // Blocks until finished.
-	if perr != nil {
-		err = perr
-	}
-	stats := pinger.Statistics()
-	duration = stats.AvgRtt
-	return
 }
 
 func requestNow(host string) error {

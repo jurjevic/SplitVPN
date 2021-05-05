@@ -60,6 +60,7 @@ func (r *router) updateRoutes() {
 		log.Printf("Failed to fetch routes. %s", err.Error())
 	}
 	routing := string(out)
+	Debugln(routing)
 	rows := strings.Split(routing, "\n")
 	inetMode := false
 	inet6Mode := false
@@ -99,7 +100,12 @@ func (r *router) getInterfacesWithGateway() []IfNet {
 
 func (r *router) updateInterfaces() {
 
-	interfaces, _ := net.Interfaces()
+	interfaces, err := net.Interfaces()
+
+	if err != nil {
+		log.Printf("Error fetching interfaces: %s\n", err.Error())
+		return
+	}
 
 	var interfaceNetworks []IfNet
 
@@ -123,6 +129,7 @@ func (r *router) updateInterfaces() {
 		}
 
 		out, err := exec.Command("/bin/sh", "-c", "ifconfig -r "+i.Name).Output()
+		Debugln(string(out))
 		if err != nil {
 			log.Printf("Failed to get interfaces. %s", err.Error())
 		}

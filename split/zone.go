@@ -1,6 +1,12 @@
 package split
 
 import (
+	"errors"
+	"github.com/go-ping/ping"
+	"log"
+	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,69 +28,118 @@ type Zone struct {
 	mutex         sync.Mutex
 }
 
-func (s *Zone) IsDefault() bool {
-	return s.isDefault
+func (z *Zone) IsDefault() bool {
+	return z.isDefault
 }
 
-func (s *Zone) HttpRequest() bool {
-	return s.httpRequest
+func (z *Zone) HttpRequest() bool {
+	return z.httpRequest
 }
 
-func (s *Zone) ActiveSince() time.Time {
-	return s.activeSince
+func (z *Zone) ActiveSince() time.Time {
+	return z.activeSince
 }
 
-func (s *Zone) Route() string {
-	return s.route
+func (z *Zone) Route() string {
+	return z.route
 }
 
-func (s *Zone) InterfaceName() string {
-	return s.interfaceName
+func (z *Zone) InterfaceName() string {
+	return z.interfaceName
 }
 
-func (s *Zone) Gateway() string {
-	return s.gateway
+func (z *Zone) Gateway() string {
+	return z.gateway
 }
 
-func (s *Zone) Host() string {
-	return s.host
+func (z *Zone) Host() string {
+	return z.host
 }
 
-func (s *Zone) update(times time.Duration) {
-	s.mutex.Lock()
+func (z *Zone) update(times time.Duration) {
+	z.mutex.Lock()
 	if times > 0 {
-		s.active = true
-		if s.activeSince == (time.Time{}) {
-			s.activeSince = time.Now()
+		z.active = true
+		if z.activeSince == (time.Time{}) {
+			z.activeSince = time.Now()
 		}
 	} else {
-		s.active = false
-		s.activeSince = time.Time{}
+		z.active = false
+		z.activeSince = time.Time{}
 	}
-	if len(s.time) >= maxResults {
-		s.time = s.time[1:]
+	if len(z.time) >= maxResults {
+		z.time = z.time[1:]
 	}
-	s.time = append(s.time, times)
-	s.mutex.Unlock()
+	z.time = append(z.time, times)
+	z.mutex.Unlock()
 }
 
-func (s *Zone) Average() (time.Duration, bool) {
-	if s.active == false {
+func (z *Zone) Average() (time.Duration, bool) {
+	if z.active == false {
 		return 0, false
 	}
-	s.mutex.Lock()
+	z.mutex.Lock()
 	var avg time.Duration = 0
 	count := 0
-	for i, _ := range s.time {
-		d := s.time[len(s.time)-1-i]
+	for i, _ := range z.time {
+		d := z.time[len(z.time)-1-i]
 		if d > 0 {
 			avg += d
 			count += 1
 		}
 	}
-	s.mutex.Unlock()
+	z.mutex.Unlock()
 	if count == 0 {
 		return 0, false
 	}
 	return avg / time.Duration(count), true
+}
+
+func (z *Zone) Ping2() error {
+	if z.host == "" {
+		return errors.New("no host defined to ping")
+	}
+	Debugf("Ping: %s\n", z.host)
+	pinger, err := ping.NewPinger(z.host)
+	if err != nil {
+		return err
+	}
+	pinger.Count = 1
+	pinger.Timeout = time.Second * 5
+	perr := pinger.Run() // Blocks until finished.
+	if perr != nil {
+		return perr
+	}
+	stats := pinger.Statistics()
+	if stats.AvgRtt == 0 {
+		Debugf("...ping was not successful!")
+	}
+	z.update(stats.AvgRtt)
+	return nil
+}
+
+func (z *Zone) Ping() error {
+	if z.host == "" {
+		return errors.New("no host defined to ping")
+	}
+	cmd := "ping -n -o -c 1 -t 5 " + z.host
+	out, err := exec.Command("/bin/sh", "-c", cmd).Output()
+	Debugln(string(out))
+	if err != nil {
+		log.Printf("Failed to ping host. %s", z.host)
+		return err
+	}
+
+	str := string(out)
+	idxTime := strings.Index(str, "time=")
+	idxMs := strings.Index(str, " ms")
+	str = str[idxTime+5:idxMs]
+	f, ferr := strconv.ParseFloat(str,64)
+	if ferr != nil {
+		log.Printf("Failed to get ping time for host. %s", z.host)
+		return err
+	}
+	d := int(f)
+	z.update(time.Duration(d)*time.Millisecond)
+	return nil
 }

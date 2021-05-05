@@ -15,11 +15,11 @@ import (
 
 
 func main() {
-
-	ui.Version = Version
+	log.SetPrefix("splitvpn ")
+	split.Version = Version
 	if getProcessOwner() != "root" {
+		log.Println("Routing changes can only be executed with 'root' privileges.Therefore:")
 		log.Fatal("'root' privileges required! Please start with 'sudo'")
-		os.Exit(1)
 	}
 
 	systray.Run(onReady, onExit)

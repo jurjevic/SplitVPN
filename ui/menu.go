@@ -8,16 +8,14 @@ import (
 	"time"
 )
 
-var (
-	Version string
-)
-
 type Menu struct {
-	inetInfo     *MenuInfo
-	vpnInfo      *MenuInfo
-	ispInfo      *MenuInfo
-	extIpInfo    *MenuInfo
-	requestSplit bool
+	inetInfo             *MenuInfo
+	vpnInfo              *MenuInfo
+	ispInfo              *MenuInfo
+	extIpInfo            *MenuInfo
+	requestSplit         bool
+	requestDiagnose      bool
+	requestAutomaticMode split.Bool
 }
 
 type MenuInfo struct {
@@ -133,10 +131,10 @@ func Setup() *Menu {
 
 	infoVpn, infoInet := createNetMenu()
 
-	createSplitNow(m)
 	createBrowserExternalIp(m)
+	createSplitNow(m)
+	createDebug(m)
 	createInfoBox()
-
 	createExitMenu()
 
 	m.inetInfo = infoInet
@@ -163,24 +161,24 @@ func (m *Menu) updateConnectedState(isp split.Isp) {
 		m.extIpInfo.title.Hide()
 		m.ispInfo.title.Hide()
 	} else {
-	m.extIpInfo.title.SetTitle("📡 " + isp.Query)
-	m.extIpInfo.title.Show()
-	m.extIpInfo.Update([]string{
-		"Status: " + isp.Status,
-		"Mobile: " + strconv.FormatBool(isp.Mobile),
-		"Proxy: " + strconv.FormatBool(isp.Proxy),
-		"Hosting: " + strconv.FormatBool(isp.Hosting),
-	})
-	m.ispInfo.title.SetTitle("🔭 " + isp.Isp)
-	m.ispInfo.title.Show()
-	m.ispInfo.Update([]string{
-		isp.As,
-		isp.Asname,
-		isp.City,
-		isp.RegionName,
-		isp.Country,
-		isp.Continent,
-	})
+		m.extIpInfo.title.SetTitle("📡 " + isp.Query)
+		m.extIpInfo.title.Show()
+		m.extIpInfo.Update([]string{
+			"Status: " + isp.Status,
+			"Mobile: " + strconv.FormatBool(isp.Mobile),
+			"Proxy: " + strconv.FormatBool(isp.Proxy),
+			"Hosting: " + strconv.FormatBool(isp.Hosting),
+		})
+		m.ispInfo.title.SetTitle("🔭 " + isp.Isp)
+		m.ispInfo.title.Show()
+		m.ispInfo.Update([]string{
+			isp.As,
+			isp.Asname,
+			isp.City,
+			isp.RegionName,
+			isp.Country,
+			isp.Continent,
+		})
 	}
 }
 
@@ -236,11 +234,23 @@ func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) spl
 	}
 	systray.SetIcon(ico)
 
-	r := split.Response{}
+	r := split.Response{
+		SplitNow:      false,
+		Diagnose:      false,
+		AutomaticMode: split.Nil,
+	}
 
 	if m.requestSplit {
 		r.SplitNow = true
 		m.requestSplit = false
+	}
+	if m.requestDiagnose {
+		r.Diagnose = true
+		m.requestDiagnose = false
+	}
+	if m.requestAutomaticMode != split.Nil {
+		r.AutomaticMode = m.requestAutomaticMode
+		m.requestAutomaticMode = split.Nil
 	}
 
 	return r
