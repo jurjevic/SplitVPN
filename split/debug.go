@@ -47,13 +47,18 @@ func printChar(char string, length int) {
 }
 
 func (s split) startDiagnose() {
+	tempAutomatic := s.automatic
+	tempDebugFlag := DebugFlag
+	DebugFlag = true
+
 	PrintTitle("Diagnose")
 	println("Version: ", Version)
-	PrintTitle("Route configs")
+	PrintTitle("Network configuration")
 	vpnRC, inetRC, ok := s.getRouteConfig()
 	if !ok {
 		println("...route not ok")
 	}
+	PrintTitle("Processing results")
 	for _, rc := range vpnRC {
 		println("VNET gateway:", rc.gateway)
 		println(".......route:", rc.route)
@@ -66,4 +71,15 @@ func (s split) startDiagnose() {
 		println(".....default:", rc.isDefault)
 		println("...interface:", rc.interfaceName)
 	}
+
+	PrintTitle("VPN Zone")
+	s.vpn.diagnose()
+	PrintTitle("INET Zone")
+	s.inet.diagnose()
+
+	println()
+	printChar("▬", 80)
+	println()
+	DebugFlag = tempDebugFlag
+	s.automatic = tempAutomatic
 }

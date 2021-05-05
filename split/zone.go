@@ -144,3 +144,15 @@ func (z *Zone) Ping() error {
 	z.update(time.Duration(d)*time.Millisecond)
 	return nil
 }
+
+func (z Zone) diagnose() {
+	println("gateway", z.gateway)
+	println("route", z.route)
+	println("ifname", z.interfaceName)
+	println("host: ", z.host)
+	println("default:", z.isDefault)
+	d, r, ok := z.Average()
+	println("ping:", d, "rate:", r, "ok:", ok)
+	println("http:", z.httpRequest)
+	println("since:", z.activeSince.String())
+}
