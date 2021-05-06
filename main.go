@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/getlantern/systray"
 	"github.com/jurjevic/SplitVPN/icon"
@@ -18,8 +19,9 @@ func main() {
 	log.SetPrefix("splitvpn ")
 	split.Version = Version
 	if getProcessOwner() != "root" {
-		log.Println("Routing changes can only be executed with 'root' privileges.Therefore:")
-		log.Fatal("'root' privileges required! Please start with 'sudo'")
+		log.Println("Starting ", flag.Arg(0), "Version:", Version, "failed")
+		log.Println("Routing changes can only be executed with 'root' privileges.")
+		log.Fatal("Fatal error: 'root' privileges required! Please start with 'sudo'")
 	}
 
 	systray.Run(onReady, onExit)

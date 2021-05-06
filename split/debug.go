@@ -54,6 +54,9 @@ func (s split) startDiagnose() {
 
 	PrintTitle("Diagnose")
 	println("Version: ", Version)
+	println("Debug Mode: ", tempDebugFlag)
+	println("Automatic Mode: ", tempAutomatic)
+
 	PrintTitle("Network configuration")
 	vpnRC, inetRC, ok := s.getRouteConfig()
 	if !ok {
