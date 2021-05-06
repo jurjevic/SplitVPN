@@ -160,7 +160,9 @@ func textScala(value, max int) string {
 
 func Setup() *Menu {
 
-	m := &Menu{}
+	m := &Menu{
+		requestAutomaticMode: split.Nil,
+	}
 
 	infoVpn, infoInet := createNetMenu()
 

@@ -9,7 +9,7 @@ if git diff-index --quiet HEAD --; then
     echo "File changes cleaned up..."
 else
     echo "Changes found! Please commit dem first"
-    # exit 1
+    exit 1
 fi
 
 # go install github.com/jurjevic/golf@latest

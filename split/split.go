@@ -47,23 +47,23 @@ func (b Bool) bool() bool {
 }
 
 const (
-	Nil Bool = iota -1
+	Nil Bool = iota - 1
 	False
 	True
 )
 
 type Response struct {
-	SplitNow            bool
-	Diagnose            bool
+	SplitNow      bool
+	Diagnose      bool
 	AutomaticMode Bool
 }
 
 func NewSplit() split {
 	return split{
-		router: newRouter(),
-		State:  NoConnected,
-		inet:   &Zone{host: "google.com"},
-		vpn:    &Zone{},
+		router:    newRouter(),
+		State:     NoConnected,
+		inet:      &Zone{host: "google.com"},
+		vpn:       &Zone{},
 		automatic: true,
 	}
 }

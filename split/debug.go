@@ -48,6 +48,7 @@ func printChar(char string, length int) {
 
 func (s split) startDiagnose() {
 	tempAutomatic := s.automatic
+	s.automatic = false
 	tempDebugFlag := DebugFlag
 	DebugFlag = true
 
