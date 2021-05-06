@@ -12,16 +12,24 @@ else
     exit 1
 fi
 
-# go install github.com/jurjevic/golf@latest
-go get github.com/blang/semver/v4@latest
+git show-ref --tags
 
 new_version="$1"
 tag_version="v$new_version"
 latest="latest"
 
-$(go env GOPATH)/bin/golf -v version.go version.go -- '
+read -p "Continue with $tag_version (or ctrl-c to exit)"
+
+golf -v version.go version.go -- '
   var NewVersion string = "'$new_version'"
 '
+
+golf -v README.md README.md -- '
+  var NewVersion string = "'$new_version'"
+'
+
+exit 1
+
 git add version.go
 git commit -m "$tag_version release build with version increment."
 
