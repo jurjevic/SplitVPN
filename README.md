@@ -3,8 +3,8 @@ Split Internet and VPN routing
 
 **ATTENTION:** This is a quick and dirty implementation
 
-```sh ###  repeat = 1; ftoken[2] = "\"" + NewVersion + "\""; Join(ftoken, " ")
-Version: 0.10.0
+```yaml ###  repeat = 1; ftoken[2] = "\"" + NewVersion + "\""; Join(ftoken, " ")
+Version: 0.9.9
 ```
 
 ## Install with brew
