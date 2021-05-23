@@ -1,3 +1,3 @@
 package main
 
-const Version = "0.9.7-beta" // ###  ftoken[3] = "\"" + NewVersion + "\""; Join(ftoken, " ")
+const Version = "0.9.8" // ###  ftoken[3] = "\"" + NewVersion + "\""; Join(ftoken, " ")

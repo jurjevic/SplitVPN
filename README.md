@@ -3,8 +3,7 @@ Split Internet and VPN routing
 
 **ATTENTION:** This is a quick and dirty implementation
 
-[comment]: <> ( ###  count = 2; ftoken[2] = "\"" + NewVersion + "\""; Join\(;ftoken, " "\);)
-```Version: 1.0.0```
+``` Version: 0.9.8 ```
 
 ## Install with brew
 ```sh
@@ -14,7 +13,7 @@ brew install splitvpn
 ```
 ```sh
 # start
-sudo splitvpn &
+sudo -b splitvpn
 ```
 ```sh
 # update

@@ -28,8 +28,6 @@ golf -v README.md README.md -- '
   var NewVersion string = "'$new_version'"
 '
 
-exit 1
-
 git add version.go
 git commit -m "$tag_version release build with version increment."
 
