@@ -28,6 +28,10 @@ type Zone struct {
 	mutex         sync.Mutex
 }
 
+func (z *Zone) Time() []time.Duration {
+	return z.time
+}
+
 func (z *Zone) IsDefault() bool {
 	return z.isDefault
 }
@@ -65,7 +69,7 @@ func (z *Zone) update(times time.Duration) {
 	z.time = append(z.time, times)
 	z.mutex.Unlock()
 	// set active state
-	_, _, ok := z.Average()
+	_, ok := z.Average()
 	if  ok  {
 		z.active = true
 		if z.activeSince == (time.Time{}) {
@@ -77,7 +81,7 @@ func (z *Zone) update(times time.Duration) {
 	}
 }
 
-func (z *Zone) Average() (time.Duration, int, bool) {
+func (z *Zone) Average() (time.Duration, bool) {
 	z.mutex.Lock()
 	var avg time.Duration = 0
 	count := 0
@@ -90,10 +94,9 @@ func (z *Zone) Average() (time.Duration, int, bool) {
 	}
 	z.mutex.Unlock()
 	if count == 0 {
-		return 0, 0, false
+		return 0, false
 	}
-	rate := (100 * count / len(z.time))
-	return avg / time.Duration(count), rate, true
+	return avg / time.Duration(count), z.time[len(z.time)-1] > 0
 }
 
 func (z *Zone) Ping2() error {
@@ -151,8 +154,8 @@ func (z Zone) diagnose() {
 	println("ifname", z.interfaceName)
 	println("host: ", z.host)
 	println("default:", z.isDefault)
-	d, r, ok := z.Average()
-	println("ping:", d, "rate:", r, "ok:", ok)
+	d, ok := z.Average()
+	println("ping:", d, "ok:", ok)
 	println("http:", z.httpRequest)
 	println("since:", z.activeSince.String())
 }

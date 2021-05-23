@@ -81,7 +81,8 @@ func (receiver *MenuInfo) UpdateNotConnected() {
 }
 
 func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
-	avg, rateValue, _ := s.Average()
+	avg, _ := s.Average()
+	pingTimes := s.Time()
 
 	gw := ""
 	if len(s.Gateway()) > 0 {
@@ -123,39 +124,27 @@ func (receiver *MenuInfo) UpdateConnected(s *split.Zone) {
 	}
 
 	rate := ""
-	if rateValue > 0 {
-		rate = "Rate: " + textScala(rateValue, 100)
+	if len(pingTimes) > 0 {
+		rate = textRatio(pingTimes, split.MaxResults)
 	}
 
 	receiver.Update([]string{gw, ifname, route, host, http, ping, rate, since})
 }
 
-func textScala(value, max int) string {
-	rate := 10 * value / max
-	switch rate {
-	case 10:
-		return "■■■■■■■■■■"
-	case 9:
-		return "■■■■■■■■■□"
-	case 8:
-		return "■■■■■■■■□□"
-	case 7:
-		return "■■■■■■■□□□"
-	case 6:
-		return "■■■■■■□□□□"
-	case 5:
-		return "■■■■■□□□□□"
-	case 4:
-		return "■■■■□□□□□□"
-	case 3:
-		return "■■■□□□□□□□"
-	case 2:
-		return "■■□□□□□□□□"
-	case 1:
-		return "■□□□□□□□□□"
-	default:
-		return "□□□□□□□□□□"
+func textRatio(duration []time.Duration, max int) string {
+	text := ""
+	for i := 0; i < max; i++ {
+		if i < len(duration) {
+			if duration[i] > 0 {
+				text += "■"
+			} else {
+				text += "□"
+			}
+		} else {
+			text += "□"
+		}
 	}
+	return text
 }
 
 func Setup() *Menu {
@@ -254,14 +243,14 @@ func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) spl
 	} else if vpnStatus == 0 && inetStatus == 0 {
 		ico = icon.Data_0_0
 	}
-	_, _, ok := vpn.Average()
+	_, ok := vpn.Average()
 	if !ok {
 		m.vpnInfo.UpdateNotConnected()
 	} else {
 		m.vpnInfo.UpdateConnected(vpn)
 	}
 
-	_, _, ok = inet.Average()
+	_, ok = inet.Average()
 	if !ok {
 		m.inetInfo.UpdateNotConnected()
 	} else {
@@ -291,10 +280,10 @@ func (m *Menu) Refresh(state split.State, inet *split.Zone, vpn *split.Zone) spl
 	return r
 }
 
-func getStatus(duration time.Duration, rate int, ok bool) int {
+func getStatus(duration time.Duration, ok bool) int {
 	if !ok {
 		return 0
-	} else if duration < 20*time.Millisecond && rate > 50 {
+	} else if duration < 20*time.Millisecond {
 		return 3
 	} else if duration < 200*time.Millisecond {
 		return 2
