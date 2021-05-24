@@ -104,21 +104,27 @@ func (s *split) observe(update func(state State, inet *Zone, vpn *Zone) Response
 		}
 		time.Sleep(time.Second)
 		if s.inet.active && s.vpn.active {
-			s.State = Connected
-			if s.inet.gateway == "" || s.vpn.gateway == "" || s.inet.host == "" || s.vpn.host == "" {
+			if s.State != Connected || s.inet.gateway == "" || s.vpn.gateway == "" || s.inet.host == "" || s.vpn.host == "" {
+				s.State = Connected
 				s.mapZone(s.getRouteConfig)
 			}
 		} else if s.inet.active && !s.vpn.active {
-			s.State = InternetConnected
-			s.mapZone(s.getRouteConfig)
+			if s.State != InternetConnected {
+				s.State = InternetConnected
+				s.mapZone(s.getRouteConfig)
+			}
 		} else if !s.inet.active && s.vpn.active {
-			s.State = VpnConnected
-			s.mapZone(s.resplit)
+			if s.State != VpnConnected {
+				s.State = VpnConnected
+				s.mapZone(s.resplit)
+			}
 		} else if !s.inet.active && !s.vpn.active {
-			s.State = NoConnected
-			s.inet.gateway = ""
-			s.vpn.gateway = ""
-			s.vpn.host = ""
+			if s.State != NoConnected {
+				s.State = NoConnected
+				s.inet.gateway = ""
+				s.vpn.gateway = ""
+				s.vpn.host = ""
+			}
 		}
 	}
 }
